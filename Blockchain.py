@@ -6,10 +6,11 @@ import requests
 
 
 class Blockchain(object):
-    def __init__(self):
+    def __init__(self, node_identifier):
         self.chain = []
         self.current_transactions = []
         self.nodes = set()
+        self.node_identifier = node_identifier
 
         # Create the genesis block
         self.new_block(previous_hash=1, proof=100)
@@ -43,12 +44,40 @@ class Blockchain(object):
         :param amount: <int> Amount
         :return: <int> The index of the Block that will hold this transaction
         """
+
+        # Controlleert of het geen block toevoeging is
+        if( not (sender == "0" and amount == 1)):
+
+            # Onthoud het totale hoeveelheid van de gene die geld wilt versturen
+            sender_total_amount = 0
+
+            # Controlleert hoeveel geld iemand heeft in de blocks.
+            for block in self.chain:
+                for transaction in block['transactions']:
+                    if(transaction['sender'] == sender):
+                        sender_total_amount -= transaction['amount']
+                    elif(transaction['recipient'] == sender):
+                        sender_total_amount += transaction['amount']
+
+            # Controlleert hoeveel geld iemand heeft in de current_transactions
+            for transaction in self.current_transactions:
+                if (transaction['sender'] == sender):
+                    sender_total_amount -= transaction['amount']
+                elif (transaction['recipient'] == sender):
+                    sender_total_amount += transaction['amount']
+
+            # Controlleert het totale hoeveelheid geld niet meer is dan het totale te versturen bedrag.
+            if(sender_total_amount < amount):
+                return False
+
+        # Maakt de transactie aan.
         self.current_transactions.append({
-            'sender':sender,
+            'sender': sender,
             'recipient': recipient,
             'amount': amount
         })
 
+        # Return de nieuwe block waarin de transactie wordt toegevoegd
         return self.last_block['index'] + 1
 
     @staticmethod
@@ -94,7 +123,7 @@ class Blockchain(object):
 
         guess = f'{last_proof}{proof}'.encode()
         guess_hash = hashlib.sha256(guess).hexdigest()
-        return guess_hash[:4] == "0000"
+        return guess_hash[:5] == "00000"
 
     def register_node(self, address):
         """
@@ -133,6 +162,37 @@ class Blockchain(object):
 
             last_block = block
             current_idex += 1
+
+        #Check if there has been no double spendings from other nodes.
+        sender_array = []
+
+        for item in chain:
+            for transaction in item['transactions']:
+                if(not (transaction['sender'] == "0" and transaction['amount'] == 1)):
+                    check_sender = False
+                    check_reciever = False
+                    for sender in sender_array:
+                        if(sender == transaction['sender']):
+                            check_sender = True
+                            sender['total_amount'] -= transaction['amount']
+                        elif(sender == transaction['recipient']):
+                            check_reciever = True
+                            sender['total_amount'] += transaction['amount']
+
+                    if(not check_sender):
+                        sender_array.append({
+                            'sender': transaction['sender'],
+                            'total_amount': 0 - transaction['amount']
+                        })
+                    if (not check_reciever):
+                        sender_array.append({
+                            'sender': transaction['recipient'],
+                            'total_amount': transaction['amount']
+                        })
+
+        for item in sender_array:
+            if(item['total_amount'] < 0):
+                return False
 
         return True
 

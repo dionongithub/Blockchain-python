@@ -13,7 +13,7 @@ app = Flask(__name__)
 node_identifier = str(uuid4()).replace('-', '')
 
 # Instantiate the Blockchain
-blockchain = Blockchain()
+blockchain = Blockchain(node_identifier)
 
 
 @app.route('/mine', methods=['GET'])
@@ -56,6 +56,11 @@ def new_transactions():
         return 'Missing values', 400
 
     index = blockchain.new_transaction(values['sender'], values['recipient'], values['amount'])
+
+    # Return error when sender does not have valid transaction
+    if(index == False):
+        response = {'message': f'Transaction failed due to lack of money'}
+        return jsonify(response), 401
 
     response = {'message': f'Transaction will be added to Block {index}'}
     return jsonify(response), 201
@@ -103,6 +108,10 @@ def consensus():
 
     return jsonify(response), 200
 
+# Ping path the check if it is still a blockchain
+@app.route('/ping', methods=['GET'])
+def ping():
+    return "Still online blockchain", 200
 
 if __name__ == '__main__':
     app.run(host='127.0.0.1', port=5000)
